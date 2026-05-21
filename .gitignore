@@ -2,3 +2,5 @@
 api.txt
 captured.wav
 captured_fixed.wav
+segment_*.wav
+q_*.wav

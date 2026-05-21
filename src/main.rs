@@ -1,43 +1,45 @@
-//! interview-assist — 实时面试辅助系统
+//! interview-assist — 固定时长捕获模式
 //!
-//! 第一步：系统音频 Loopback 捕获 (WASAPI)
+//! Pipeline: 捕获 → STT → LLM
 //!
-//! 使用说明：
-//! 1. 打开任何音频内容（YouTube/音乐/面试软件）
-//! 2. 运行本程序
-//! 3. 程序自动捕获系统输出音频
-//! 4. 保存为 captured.wav
+//! 使用：cargo run --release
 
-mod audio;
-
+use interview_assist::{api, audio, llm, stt};
 use anyhow::Result;
 
 fn main() -> Result<()> {
     println!("╔══════════════════════════════════════╗");
-    println!("║   面试辅助 - 系统音频捕获测试         ║");
+    println!("║   面试辅助 - 固定时长捕获             ║");
     println!("╚══════════════════════════════════════╝\n");
 
-    // 列出所有音频输出设备
-    audio::list_devices()?;
-    println!();
+    let config = api::Config::from_file("api.txt")?;
+    println!("🔑 DeepSeek:  {}", config.deepseek_url);
+    println!("🔑 SiliconFlow: {}\n", config.siliconflow_url);
 
-    // 创建 WASAPI Loopback 捕获器
+    // 捕获音频
+    println!("═══ 第一步：音频捕获 ═══");
     let capture = audio::LoopbackCapture::new()?;
+    println!("\n⏱️  现在请播放面试提问音频...\n");
+    println!("📌 捕获 15 秒\n");
 
-    // 捕获 10 秒系统音频
-    let data = capture.capture(10)?;
-
-    // 保存为 WAV 文件
+    let data = capture.capture(15)?;
+    if data.is_empty() {
+        eprintln!("❌ 未捕获到音频");
+        return Ok(());
+    }
     capture.save_wav(&data, "captured.wav")?;
 
-    if data.is_empty() {
-        println!();
-        println!("⚠️  未捕获到音频 — 请确保系统正在播放音频！");
-        println!("   提示：打开 YouTube/B站 播放视频后重试");
-    } else {
-        println!();
-        println!("✅ 成功！captured.wav 可直接播放");
-    }
+    // STT
+    println!("\n═══ 第二步：语音识别 ═══");
+    let transcript = stt::transcribe(&config, "captured.wav")?;
+    println!("📝 识别: \"{}\"", transcript);
+
+    // LLM
+    println!("\n═══ 第三步：生成回答 ═══");
+    let answer = llm::ask(&config, &transcript)?;
+    println!("\n💡 候选回答:\n");
+    println!("{}", answer);
+    println!("\n{}\n✅ 完成", "=".repeat(50));
 
     Ok(())
 }
