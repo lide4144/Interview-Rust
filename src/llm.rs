@@ -57,7 +57,7 @@ pub fn ask(config: &Config, question: &str) -> Result<String> {
     let url = format!("{}/chat/completions", config.deepseek_url);
 
     let request = ChatRequest {
-        model: "deepseek-chat".to_string(),
+        model: "deepseek-v4-flash".to_string(),
         messages: vec![
             Message {
                 role: "system".to_string(),
@@ -135,7 +135,7 @@ pub fn ask_with_history(
     });
 
     let request = ChatRequest {
-        model: "deepseek-chat".to_string(),
+        model: "deepseek-v4-flash".to_string(),
         messages,
         stream: false,
         temperature: 0.7,
