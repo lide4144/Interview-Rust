@@ -17,7 +17,7 @@ fn main() -> Result<()> {
     println!("║   面试辅助 v3 — 内置悬浮窗           ║");
     println!("╚══════════════════════════════════════╝\n");
 
-    let config = api::Config::from_file("api.txt")?;
+    let config = api::Config::from_file("config.yaml")?;
     let history: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
     let running = Arc::new(AtomicBool::new(true));
 
@@ -129,12 +129,11 @@ fn run_overlay(running: Arc<AtomicBool>) {
     use windows::Win32::UI::WindowsAndMessaging::{
         CreateWindowExW, DefWindowProcW, DispatchMessageW, GetClientRect, GetMessageW,
         GetSystemMetrics, PostQuitMessage, RegisterClassW,
-        SetLayeredWindowAttributes, SetWindowDisplayAffinity, SetWindowPos, ShowWindow,
+        SetWindowDisplayAffinity, SetWindowPos, ShowWindow,
         TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
-        HWND_TOPMOST, LWA_ALPHA, SM_CXSCREEN, SM_CYSCREEN, SWP_NOZORDER,
+        HWND_TOPMOST, SM_CXSCREEN, SM_CYSCREEN, SWP_NOZORDER,
         SW_SHOW, WDA_EXCLUDEFROMCAPTURE, WM_DESTROY, WM_PAINT,
-        WNDCLASSW, WS_EX_LAYERED, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
-        WS_THICKFRAME,
+        WNDCLASSW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW,
     };
     use windows::core::PCWSTR;
 
@@ -156,18 +155,17 @@ fn run_overlay(running: Arc<AtomicBool>) {
 
     let hwnd = unsafe {
         CreateWindowExW(
-            WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT,  // TRANSPARENT = 点击穿透
+            WS_EX_TOPMOST,  // 只置顶，无透明/穿透
             PCWSTR::from_raw(cn.as_ptr()),
-            PCWSTR::from_raw(w("🎯").as_ptr()),
-            WS_POPUP | WS_THICKFRAME,  // 可缩放边框
+            PCWSTR::from_raw(w("面试辅助").as_ptr()),
+            WS_OVERLAPPEDWINDOW,  // 标准窗口：标题栏+边框+缩放
             CW_USEDEFAULT, CW_USEDEFAULT, 700, 350,
             None, None, Some(hi), None,
         ).unwrap()
     };
 
     unsafe {
-        let _ = SetLayeredWindowAttributes(hwnd, c(0, 0, 0), 200, LWA_ALPHA);
-        let _ = SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+        let _ = SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);  // 屏幕共享隐身
     }
 
     let sw = unsafe { GetSystemMetrics(SM_CXSCREEN) };
@@ -178,49 +176,20 @@ fn run_overlay(running: Arc<AtomicBool>) {
     // 存储 HWND 供后台线程触发重绘
     *OVERLAY_HWND.lock().unwrap() = hwnd.0 as isize;
 
-    println!("🪟 悬浮窗 → 右下角 | 屏幕共享隐身 ✅ | F9 切换拖动模式");
-
-    // F9 切换点击穿透
-    let mut click_through = true;
-    let hwnd_raw = hwnd.0 as isize;
-    thread::spawn(move || {
-        use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_F9};
-        let hwnd = windows::Win32::Foundation::HWND(hwnd_raw as *mut _);
-        let mut last_f9 = false;
-        loop {
-            let f9 = unsafe { GetAsyncKeyState(VK_F9.0 as i32) } < 0;
-            if f9 && !last_f9 {
-                click_through = !click_through;
-                let ex = if click_through {
-                    WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT
-                } else {
-                    WS_EX_LAYERED | WS_EX_TOPMOST
-                };
-                unsafe {
-                    let _ = windows::Win32::UI::WindowsAndMessaging::SetWindowLongW(
-                        hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
-                        ex.0 as i32,
-                    );
-                    let _ = SetWindowPos(
-                        hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0,
-                        SWP_NOZORDER | windows::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
-                            | windows::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
-                            | windows::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
-                    );
-                }
-                println!("\n🪟 点击穿透: {}", if click_through { "ON" } else { "OFF (可拖动)" });
-            }
-            last_f9 = f9;
-            thread::sleep(std::time::Duration::from_millis(200));
-        }
-    });
+    println!("🪟 悬浮窗 → 右下角 | 可拖可缩 | 屏幕共享隐身 ✅");
 
     let mut msg: windows::Win32::UI::WindowsAndMessaging::MSG = unsafe { std::mem::zeroed() };
     while running.load(Ordering::SeqCst) {
-        unsafe { GetMessageW(&mut msg, None, 0, 0) };
+        let ret = unsafe { GetMessageW(&mut msg, None, 0, 0) };
+        if ret.0 == 0 {
+            // WM_QUIT — 窗口被关闭
+            break;
+        }
         unsafe { let _ = TranslateMessage(&msg); DispatchMessageW(&msg); }
     }
+
+    running.store(false, Ordering::SeqCst);
+    println!("\n🪟 窗口已关闭");
 
     extern "system" fn wndproc(h: HWND, m: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
         match m {

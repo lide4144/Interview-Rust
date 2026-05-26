@@ -1,47 +1,88 @@
-//! API 配置 — 从 api.txt 读取各平台凭据
+//! API 配置 — 从 config.yaml 读取
 
 use anyhow::{anyhow, Result};
+use serde::Deserialize;
 use std::path::Path;
 
-#[derive(Clone)]
+#[derive(Deserialize, Clone)]
 pub struct Config {
-    pub deepseek_url: String,
-    pub deepseek_key: String,
-    pub siliconflow_url: String,
-    pub siliconflow_key: String,
-    pub bailian_key: String,
+    #[serde(default = "default_llm_provider")]
+    pub llm_provider: String,
+    #[serde(default = "default_llm_model")]
+    pub llm_model: String,
+    #[serde(default = "default_stt_model")]
+    pub stt_model: String,
+
+    pub deepseek: Provider,
+    #[serde(default)]
+    pub openai: OpenAiProvider,
+    pub siliconflow: Provider,
+    pub bailian: Provider,
+    #[serde(default)]
+    pub ark: Provider,
 }
+
+#[derive(Deserialize, Clone, Default)]
+pub struct Provider {
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub key: String,
+}
+
+#[derive(Deserialize, Clone, Default)]
+pub struct OpenAiProvider {
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub key: String,
+    #[serde(default)]
+    pub model: String,
+}
+
+fn default_llm_provider() -> String { "deepseek".into() }
+fn default_llm_model() -> String { "deepseek-v4-flash".into() }
+fn default_stt_model() -> String { "FunAudioLLM/SenseVoiceSmall".into() }
 
 impl Config {
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
         let content = std::fs::read_to_string(path.as_ref())
-            .map_err(|e| anyhow!("无法读取 api.txt: {e}"))?;
+            .map_err(|e| anyhow!("无法读取 config.yaml: {e}"))?;
 
-        let lines: Vec<&str> = content.lines().collect();
+        let config: Self = serde_yaml::from_str(&content)
+            .map_err(|e| anyhow!("config.yaml 格式错误: {e}"))?;
 
-        // 前4行：deepseek url, deepseek key, 空行, siliconflow url
-        let deepseek_url = lines.get(0).map(|s| s.trim()).unwrap_or("");
-        let deepseek_key = lines.get(1).map(|s| s.trim()).unwrap_or("");
-        let siliconflow_url = lines.get(3).map(|s| s.trim()).unwrap_or("");
-        let siliconflow_key = lines.get(4).map(|s| s.trim()).unwrap_or("");
-
-        // 找 阿里云api-key: 开头的行
-        let bailian_key = lines.iter()
-            .find(|l| l.starts_with("阿里云api-key:"))
-            .and_then(|l| l.split(':').nth(1))
-            .map(|s| s.trim())
-            .unwrap_or("");
-
-        if deepseek_key.is_empty() || deepseek_url.is_empty() {
-            return Err(anyhow!("api.txt 中未找到 DeepSeek 配置"));
+        if config.llm_provider == "openai" && config.openai.key.is_empty() {
+            return Err(anyhow!("config.yaml: openai.key 未配置"));
         }
 
-        Ok(Self {
-            deepseek_url: deepseek_url.to_string(),
-            deepseek_key: deepseek_key.to_string(),
-            siliconflow_url: siliconflow_url.to_string(),
-            siliconflow_key: siliconflow_key.to_string(),
-            bailian_key: bailian_key.to_string(),
-        })
+        Ok(config)
     }
+
+    /// 获取当前 LLM 的 URL 和 Key
+    pub fn llm_url(&self) -> &str {
+        match self.llm_provider.as_str() {
+            "openai" => &self.openai.url,
+            _ => &self.deepseek.url,
+        }
+    }
+
+    pub fn llm_key(&self) -> &str {
+        match self.llm_provider.as_str() {
+            "openai" => &self.openai.key,
+            _ => &self.deepseek.key,
+        }
+    }
+
+    pub fn llm_model_id(&self) -> &str {
+        match self.llm_provider.as_str() {
+            "openai" if !self.openai.model.is_empty() => &self.openai.model,
+            _ => &self.llm_model,
+        }
+    }
+
+    // 兼容旧接口
+    pub fn siliconflow_url(&self) -> &str { &self.siliconflow.url }
+    pub fn siliconflow_key(&self) -> &str { &self.siliconflow.key }
+    pub fn bailian_key(&self) -> &str { &self.bailian.key }
 }

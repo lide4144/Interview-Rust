@@ -1,0 +1,30 @@
+# 面试辅助系统 — API 配置文件
+# 复制为 config.yaml 并填入你的 API Key
+
+# 使用的 LLM 提供商和模型
+llm_provider: deepseek     # deepseek | openai
+llm_model: deepseek-v4-flash
+
+stt_model: FunAudioLLM/SenseVoiceSmall
+
+deepseek:
+  url: https://api.deepseek.com/v1
+  key: sk-your-deepseek-key
+
+# OpenAI 兼容接口（支持任何兼容 API：OpenAI / Groq / Together / vLLM 等）
+openai:
+  url: https://api.openai.com/v1
+  key: sk-your-openai-key
+  model: gpt-4o-mini
+
+siliconflow:
+  url: https://api.siliconflow.cn/v1
+  key: sk-your-siliconflow-key
+
+bailian:
+  url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  key: sk-your-bailian-key
+
+ark:
+  url: https://ark.cn-beijing.volces.com/api/v3
+  key: your-ark-key

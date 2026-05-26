@@ -54,10 +54,10 @@ const SYSTEM_PROMPT: &str = "\
 
 /// 将面试官问题发送给 DeepSeek，获取候选回答
 pub fn ask(config: &Config, question: &str) -> Result<String> {
-    let url = format!("{}/chat/completions", config.deepseek_url);
+    let url = format!("{}/chat/completions", config.llm_url());
 
     let request = ChatRequest {
-        model: "deepseek-v4-flash".to_string(),
+        model: config.llm_model_id().to_string(),
         messages: vec![
             Message {
                 role: "system".to_string(),
@@ -76,7 +76,7 @@ pub fn ask(config: &Config, question: &str) -> Result<String> {
     let body = serde_json::to_string(&request)?;
 
     let resp = ureq::post(&url)
-        .set("Authorization", &format!("Bearer {}", config.deepseek_key))
+        .set("Authorization", &format!("Bearer {}", config.llm_key()))
         .set("Content-Type", "application/json")
         .send_string(&body)
         .map_err(|e| anyhow!("LLM 请求失败: {e}"))?;
@@ -105,7 +105,7 @@ pub fn ask_with_history(
     question: &str,
     history: &std::sync::Mutex<Vec<(String, String)>>,
 ) -> Result<String> {
-    let url = format!("{}/chat/completions", config.deepseek_url);
+    let url = format!("{}/chat/completions", config.llm_url());
 
     let mut messages = vec![Message {
         role: "system".to_string(),
@@ -135,7 +135,7 @@ pub fn ask_with_history(
     });
 
     let request = ChatRequest {
-        model: "deepseek-v4-flash".to_string(),
+        model: config.llm_model_id().to_string(),
         messages,
         stream: false,
         temperature: 0.7,
@@ -145,7 +145,7 @@ pub fn ask_with_history(
     let body = serde_json::to_string(&request)?;
 
     let resp = ureq::post(&url)
-        .set("Authorization", &format!("Bearer {}", config.deepseek_key))
+        .set("Authorization", &format!("Bearer {}", config.llm_key()))
         .set("Content-Type", "application/json")
         .send_string(&body)
         .map_err(|e| anyhow!("LLM 请求失败: {e}"))?;
