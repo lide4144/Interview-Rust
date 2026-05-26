@@ -1,6 +1,8 @@
 /target
 api.txt
+config.yaml
 captured.wav
 captured_fixed.wav
 segment_*.wav
 q_*.wav
+answer.txt

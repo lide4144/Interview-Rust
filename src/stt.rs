@@ -41,7 +41,7 @@ pub fn transcribe_bytes(
 
 /// 公共发送逻辑
 fn transcribe_inner(config: &Config, wav_data: &[u8], filename: &str) -> Result<String> {
-    let url = format!("{}/audio/transcriptions", config.siliconflow_url);
+    let url = format!("{}/audio/transcriptions", config.siliconflow_url());
 
     let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
     let mut body = Vec::new();
@@ -65,7 +65,7 @@ fn transcribe_inner(config: &Config, wav_data: &[u8], filename: &str) -> Result<
     let content_type = format!("multipart/form-data; boundary={boundary}");
 
     let resp = ureq::post(&url)
-        .set("Authorization", &format!("Bearer {}", config.siliconflow_key))
+        .set("Authorization", &format!("Bearer {}", config.siliconflow_key()))
         .set("Content-Type", &content_type)
         .send_bytes(&body)
         .map_err(|e| anyhow!("STT 请求失败: {e}"))?;

@@ -12,9 +12,9 @@ fn main() -> Result<()> {
     println!("║   面试辅助 - 固定时长捕获             ║");
     println!("╚══════════════════════════════════════╝\n");
 
-    let config = api::Config::from_file("api.txt")?;
-    println!("🔑 DeepSeek:  {}", config.deepseek_url);
-    println!("🔑 SiliconFlow: {}\n", config.siliconflow_url);
+    let config = api::Config::from_file("config.yaml")?;
+    println!("🔑 DeepSeek:  {}", config.deepseek.url);
+    println!("🔑 SiliconFlow: {}\n", config.siliconflow_url());
 
     // 捕获音频
     println!("═══ 第一步：音频捕获 ═══");
