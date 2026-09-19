@@ -9,16 +9,26 @@ fn main() -> Result<()> {
     println!("║   LLM 延迟基准测试 v5                ║");
     println!("╚══════════════════════════════════════╝\n");
 
-    let providers = [
-        ("DeepSeek",    "https://api.deepseek.com/v1",           "REDACTED-KEY"),
-        ("SiliconFlow", "https://api.siliconflow.cn/v1",         "REDACTED-KEY"),
-        ("Bailian",     "https://dashscope.aliyuncs.com/compatible-mode/v1", "REDACTED-KEY"),
-        ("Ark",         "https://ark.cn-beijing.volces.com/api/v3", "REDACTED-KEY"),
+    let mut providers: Vec<(String, String, String)> = vec![
+        ("DeepSeek".into(),    "https://api.deepseek.com/v1".into(),           std::env::var("BENCH_DEEPSEEK_KEY").unwrap_or_default()),
+        ("SiliconFlow".into(), "https://api.siliconflow.cn/v1".into(),         std::env::var("BENCH_SILICONFLOW_KEY").unwrap_or_default()),
+        ("Bailian".into(),     "https://dashscope.aliyuncs.com/compatible-mode/v1".into(), std::env::var("BENCH_BAILIAN_KEY").unwrap_or_default()),
+        ("Ark".into(),         "https://ark.cn-beijing.volces.com/api/v3".into(), std::env::var("BENCH_ARK_KEY").unwrap_or_default()),
     ];
+    // optional extra OpenAI-compatible endpoint (e.g. a local llama.cpp server)
+    if let Ok(base) = std::env::var("BENCH_EXTRA_BASE") {
+        providers.push((
+            std::env::var("BENCH_EXTRA_NAME").unwrap_or_else(|_| "Local".into()),
+            base,
+            std::env::var("BENCH_EXTRA_KEY").unwrap_or_else(|_| "none".into()),
+        ));
+    }
+    let providers: Vec<_> = providers.into_iter().filter(|(_, _, k)| !k.is_empty()).collect();
+    let providers_ref: Vec<(&str, &str, &str)> = providers.iter().map(|(a, b, c)| (a.as_str(), b.as_str(), c.as_str())).collect();
 
     // Step 1: 拉模型列表
     let mut all: Vec<(String, String, String, String)> = Vec::new();
-    for (name, url, key) in &providers {
+    for (name, url, key) in &providers_ref {
         print!("📋 {name}: ");
         let _ = io::stdout().flush();
         match ureq::get(&format!("{url}/models"))
